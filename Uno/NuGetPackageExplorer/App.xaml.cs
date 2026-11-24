@@ -402,7 +402,9 @@ namespace PackageExplorer
                 }
 
                 // Assume everything else should be a path
-                var deeplink = e.Arguments?.NullIfEmpty();
+                // Environment.CommandLine quotes arguments that contain spaces, so a path such as
+                // "/Users/me/My Packages/foo.nupkg" arrives wrapped in quotes.
+                var deeplink = e.Arguments?.Trim().Trim('"').NullIfEmpty();
                 if (!string.IsNullOrWhiteSpace(deeplink))
                 {
                     return new FileInfo(deeplink);
