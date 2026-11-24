@@ -29,5 +29,7 @@ Run it again after pulling to update.
 - `NuGetPackageExplorer.WinUI.csproj` targets only `net10.0-desktop`, so the build needs neither the
   Windows SDK nor the WebAssembly workload.
 - A launch argument wrapped in quotes (a path containing spaces) is unquoted before it is opened.
+- The Uno macOS `.app` launcher starts the runtime without passing on the process arguments, so on
+  macOS the app reads the file path from the native process arguments (`_NSGetArgv`) instead.
 
 Some features are still unimplemented in the Uno build and may show "not implemented" errors.

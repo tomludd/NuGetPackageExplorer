@@ -3,6 +3,7 @@ using System.ComponentModel.Composition.Hosting;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 
 using CommunityToolkit.WinUI.Helpers;
@@ -404,7 +405,7 @@ namespace PackageExplorer
                 // Assume everything else should be a path
                 // Environment.CommandLine quotes arguments that contain spaces, so a path such as
                 // "/Users/me/My Packages/foo.nupkg" arrives wrapped in quotes.
-                var deeplink = e.Arguments?.Trim().Trim('"').NullIfEmpty();
+                var deeplink = e.Arguments?.Trim().Trim('"').NullIfEmpty() ?? GetMacOSNativeLaunchArgument();
                 if (!string.IsNullOrWhiteSpace(deeplink))
                 {
                     return new FileInfo(deeplink);
@@ -421,6 +422,39 @@ namespace PackageExplorer
                 return null;
             }
         }
+
+#if !__WASM__
+        /// <summary>
+        /// The Uno macOS .app launcher starts the runtime with coreclr_execute_assembly without passing on
+        /// the process arguments, so Environment.GetCommandLineArgs() never sees them. Read the first one
+        /// from the native process instead.
+        /// </summary>
+        private static string? GetMacOSNativeLaunchArgument()
+        {
+            if (!OperatingSystem.IsMacOS())
+            {
+                return null;
+            }
+
+            var argc = Marshal.ReadInt32(NSGetArgc());
+            if (argc < 2)
+            {
+                return null;
+            }
+
+            var argv = Marshal.ReadIntPtr(NSGetArgv());
+            var argument = Marshal.PtrToStringUTF8(Marshal.ReadIntPtr(argv, IntPtr.Size));
+
+            // Older macOS versions pass a process serial number when an app is started from Finder.
+            return argument is null || argument.StartsWith("-psn_", StringComparison.Ordinal) ? null : argument;
+        }
+
+        [DllImport("/usr/lib/libSystem.dylib", EntryPoint = "_NSGetArgc")]
+        private static extern IntPtr NSGetArgc();
+
+        [DllImport("/usr/lib/libSystem.dylib", EntryPoint = "_NSGetArgv")]
+        private static extern IntPtr NSGetArgv();
+#endif
 
         [RequiresUnreferencedCode("MEF composition resolves services and view models via reflection.")]
         private void InitializeContainer()
